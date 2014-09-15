@@ -34,10 +34,10 @@
 /**************************************************************************
  * Public Definitions
  **************************************************************************/
-#define L3_NUM_WAYS   20                    // cat /sys/devices/system/cpu/cpu0/cache/index3/ways..
-#define NUM_ENTRIES   (L3_NUM_WAYS*2)       // # of list entries to iterate
-#define ENTRY_SHIFT   (22)                  // [27:23] bits are used for iterations? interval:32MB
-#define ENTRY_DIST    (1<<ENTRY_SHIFT)      // distance between the two entries
+#define L3_NUM_WAYS   16                    // cat /sys/devices/system/cpu/cpu0/cache/index3/ways..
+#define NUM_ENTRIES   (uint64_t)(L3_NUM_WAYS * 2)       // # of list entries to iterate
+#define ENTRY_SHIFT   (24)                  // [27:23] bits are used for iterations? interval:32MB
+#define ENTRY_DIST    (uint64_t)(1<<ENTRY_SHIFT)      // distance between the two entries
 #define CACHE_LINE_SIZE 64
 
 #define MAX(a,b) ((a>b)?(a):(b))
@@ -53,12 +53,12 @@
 /**************************************************************************
  * Global Variables
  **************************************************************************/
-static int g_mem_size = NUM_ENTRIES * ENTRY_DIST;
+static uint64_t g_mem_size = (uint64_t)((NUM_ENTRIES) * (ENTRY_DIST));
 /* bank data */
 static int* list;
 /* index array for accessing banks */
-static int indices[NUM_ENTRIES];
-static int next;
+static uint64_t indices[NUM_ENTRIES];
+static uint64_t next;
 
 /**************************************************************************
  * Public Function Prototypes
@@ -200,7 +200,13 @@ int main(int argc, char* argv[])
 		exit(1);
 	} 
 #endif
-	
+
+#if defined(TEST)
+	printf("/////////////////ENTRY_DIST : %lu\n////////////////", ENTRY_DIST);
+	printf("/////////////////NUM_ENTRIES : %lu\n////////////////", NUM_ENTRIES);
+	printf("/////////////////NUM_ENTRIES * ENTRY_DIST : %lu\n////////////////", NUM_ENTRIES * ENTRY_DIST);
+	printf("/////////////////g_mem_size = NUM_ENTRIES * ENTRY_DIST : %lu\n////////////////", g_mem_size);
+#endif
 	list = &memchunk[off_idx];
 	for (i = 0; i < NUM_ENTRIES; i++) {
 		if (i == (NUM_ENTRIES - 1))
@@ -223,7 +229,7 @@ int main(int argc, char* argv[])
 	int64_t nsdiff = get_elapsed(&start, &end);
 	double  avglat = (double)nsdiff/naccess;
 
-	printf("size: %d (%d KB)\n", g_mem_size, g_mem_size/1024);
+	printf("size: %ld (%ld KB)\n", g_mem_size, g_mem_size/1024);
 	printf("duration %ld ns, #access %d\n", nsdiff, naccess);
 	printf("average latency: %ld ns\n", nsdiff/naccess);
 	printf("bandwidth %.2f MB/s\n", (double)64*1000*naccess/nsdiff);

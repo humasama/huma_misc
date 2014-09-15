@@ -7,7 +7,7 @@ echo "Run a background task on core1-3"
 sleep 1
 
 echo "Now run the test"
-for b in `seq 29 30`; do	#upper limit : 28 #23
+for b in `seq 6 24`; do	#upper limit : 28 #23
 	echo -n "Bit$b: "
 	./mc-mapping -c 0 -i 9000000 -b $b -x | grep band | awk '{ print $2 }' || echo "N/A"
 done
