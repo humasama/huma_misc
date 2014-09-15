@@ -36,7 +36,7 @@
  **************************************************************************/
 #define L3_NUM_WAYS   16                    // cat /sys/devices/system/cpu/cpu0/cache/index3/ways..
 #define NUM_ENTRIES   (uint64_t)(L3_NUM_WAYS * 2)       // # of list entries to iterate
-#define ENTRY_SHIFT   (24)                  // [27:23] bits are used for iterations? interval:32MB
+#define ENTRY_SHIFT   (25)                  // [27:23] bits are used for iterations? interval:32MB
 #define ENTRY_DIST    (uint64_t)(1<<ENTRY_SHIFT)      // distance between the two entries
 #define CACHE_LINE_SIZE 64
 
@@ -81,7 +81,7 @@ uint64_t get_elapsed(struct timespec *start, struct timespec *end)
  * Implementation
  **************************************************************************/
 //using array accesses phy address
-int run(int iter)
+int run(uint64_t iter)
 {
 	int i, j = 0;
 	int cnt = 0;
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 	int opt, prio;
 	int i,j;
 
-	int repeat = 1000;
+	uint64_t repeat = 1000;
 
 	int page_shift = 0;
 	int xor_page_shift = 0;
@@ -147,8 +147,8 @@ int main(int argc, char* argv[])
 				perror("error");
 			break;
 		case 'i': /* iterations */
-			repeat = strtol(optarg, NULL, 0);
-			printf("repeat=%d\n", repeat);
+			repeat = (uint64_t)strtol(optarg, NULL, 0);
+			printf("repeat=%lu\n", repeat);
 			break;
 		}
 
