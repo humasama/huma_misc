@@ -1,33 +1,20 @@
-/**
- * 
- *
- * Copyright (C) 2013  Heechul Yun <heechul@illinois.edu> 
- *
- * This file is distributed under the University of Illinois Open Source
- * License. See LICENSE.TXT for details.
- *
- */ 
-
-/**************************************************************************
- * Conditional Compilation Options
- **************************************************************************/
-
-/**************************************************************************
- * Included Files
- **************************************************************************/
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 #include <sched.h>
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <unistd.h>
+
 #include <sys/time.h>
+#include <time.h>
+
 #include <inttypes.h>
+
 #include <sys/mman.h>
-#include <sys/types.h>
 #include <fcntl.h>
+
+#include <sys/types.h>
 #include <errno.h>
-#include <sys/time.h>
 #include <sys/resource.h>
 #include <assert.h>
 
@@ -36,7 +23,7 @@
  **************************************************************************/
 #define L3_NUM_WAYS   16                    // cat /sys/devices/system/cpu/cpu0/cache/index3/ways..
 #define NUM_ENTRIES   (uint64_t)(L3_NUM_WAYS * 2)       // # of list entries to iterate
-#define ENTRY_SHIFT   (25)                  // [27:23] bits are used for iterations? interval:32MB
+#define ENTRY_SHIFT   (17)                  // [27:23] bits are used for iterations? interval:32MB
 #define ENTRY_DIST    (uint64_t)(1<<ENTRY_SHIFT)      // distance between the two entries
 #define CACHE_LINE_SIZE 64
 
@@ -81,10 +68,10 @@ uint64_t get_elapsed(struct timespec *start, struct timespec *end)
  * Implementation
  **************************************************************************/
 //using array accesses phy address
-int run(uint64_t iter)
+uint64_t run(uint64_t iter)
 {
-	int i, j = 0;
-	int cnt = 0;
+	uint64_t i, j = 0;
+	uint64_t cnt = 0;
 	int data;
 
 	for (i = 0; i < iter; i++) {
@@ -222,7 +209,7 @@ int main(int argc, char* argv[])
 	clock_gettime(CLOCK_REALTIME, &start);
 
 	/* access banks */
-	int naccess = run(repeat);
+	uint64_t naccess = run(repeat);
 
 	clock_gettime(CLOCK_REALTIME, &end);
 
@@ -230,9 +217,9 @@ int main(int argc, char* argv[])
 	double  avglat = (double)nsdiff/naccess;
 
 	printf("size: %ld (%ld KB)\n", g_mem_size, g_mem_size/1024);
-	printf("duration %ld ns, #access %d\n", nsdiff, naccess);
+	printf("duration %ld ns, #access %ld\n", nsdiff, naccess);
 	printf("average latency: %ld ns\n", nsdiff/naccess);
-	printf("bandwidth %.2f MB/s\n", (double)64*1000*naccess/nsdiff);
+	printf("bandwidth %.2f MB/s\n", 64.0*1000.0*(double)naccess/(double)nsdiff);
 
 	return 0;
 }
