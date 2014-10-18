@@ -23,7 +23,7 @@
  **************************************************************************/
 #define L3_NUM_WAYS   16                    // cat /sys/devices/system/cpu/cpu0/cache/index3/ways..
 #define NUM_ENTRIES   (uint64_t)(L3_NUM_WAYS * 2)       // # of list entries to iterate
-#define ENTRY_SHIFT   (17)                  // [27:23] bits are used for iterations? interval:32MB
+#define ENTRY_SHIFT   (28)                  // [27:23] bits are used for iterations? interval:32MB
 #define ENTRY_DIST    (uint64_t)(1<<ENTRY_SHIFT)      // distance between the two entries
 #define CACHE_LINE_SIZE 64
 
@@ -33,14 +33,20 @@
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
    __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
-/**************************************************************************
- * Public Types
- **************************************************************************/
+#define RANDOM 1
 
-/**************************************************************************
- * Global Variables
- **************************************************************************/
-static uint64_t g_mem_size = (uint64_t)((NUM_ENTRIES) * (ENTRY_DIST));
+#ifdef RANDOM
+#define RANGE_RIGHT 32
+#define RANGE_LEFT 28
+#define ENTRY_DIST_AVG ((uint64_t)1 << (RANGE_LEFT))
+/* NUM_ENTRIES indices, randomly choose one for one access.
+   whole length = 2^RANGE_LEFT */
+static uint64_t g_mem_size = NUM_ENTRIES * ENTRY_DIST_AVG;
+#else
+static uint64_t g_mem_size = NUM_ENTRIES * ENTRY_DIST;
+#endif
+
+
 /* bank data */
 static int* list;
 /* index array for accessing banks */
@@ -64,10 +70,6 @@ uint64_t get_elapsed(struct timespec *start, struct timespec *end)
 
 }
 
-/**************************************************************************
- * Implementation
- **************************************************************************/
-//using array accesses phy address
 uint64_t run(uint64_t iter)
 {
 	uint64_t i, j = 0;
@@ -89,7 +91,7 @@ uint64_t run(uint64_t iter)
 int main(int argc, char* argv[])
 {
 	struct sched_param param;
-        cpu_set_t cmask;
+	cpu_set_t cmask;
 	int num_processors;
 	int cpuid = 0;
 	int use_dev_mem = 0;
@@ -101,51 +103,58 @@ int main(int argc, char* argv[])
 	uint64_t repeat = 1000;
 
 	int page_shift = 0;
-	int xor_page_shift = 0;
+	int xor_page_shift = -1;
 
 	/*
 	 * get command line options 
 	 */
 	while ((opt = getopt(argc, argv, "a:xb:s:o:m:c:i:l:h")) != -1) {
 		switch (opt) {
-		case 'b': /* bank bit */
-			page_shift = strtol(optarg, NULL, 0);
-			break;
-		case 's': /* xor-bank bit */
-			xor_page_shift = strtol(optarg, NULL, 0);
-			break;
-		case 'm': /* set memory size */
-			g_mem_size = 1024 * strtol(optarg, NULL, 0);
-			break;
-		case 'x': /* mmap to /dev/mem, owise use hugepage */
-			use_dev_mem = 1;
-			break;
-		case 'c': /* set CPU affinity */
-			cpuid = strtol(optarg, NULL, 0);
-			num_processors = sysconf(_SC_NPROCESSORS_CONF);
-			CPU_ZERO(&cmask);
-			CPU_SET(cpuid % num_processors, &cmask);
-			if (sched_setaffinity(0, num_processors, &cmask) < 0)
-				perror("error");
-			break;
-		case 'p': /* set priority */
-			prio = strtol(optarg, NULL, 0);
-			if (setpriority(PRIO_PROCESS, 0, prio) < 0)
-				perror("error");
-			break;
-		case 'i': /* iterations */
-			repeat = (uint64_t)strtol(optarg, NULL, 0);
-			printf("repeat=%lu\n", repeat);
-			break;
+			case 'b': /* bank bit */
+				page_shift = strtol(optarg, NULL, 0);
+				break;
+			case 's': /* xor-bank bit */
+				xor_page_shift = strtol(optarg, NULL, 0);
+				break;
+			case 'm': /* set memory size */
+				g_mem_size = 1024 * strtol(optarg, NULL, 0);
+				break;
+			case 'x': /* mmap to /dev/mem, owise use hugepage */
+				use_dev_mem = 1;
+				break;
+			case 'c': /* set CPU affinity */
+				cpuid = strtol(optarg, NULL, 0);
+				num_processors = sysconf(_SC_NPROCESSORS_CONF);
+				CPU_ZERO(&cmask);
+				CPU_SET(cpuid % num_processors, &cmask);
+				if (sched_setaffinity(0, num_processors, &cmask) < 0)
+					perror("error");
+				break;
+			case 'p': /* set priority */
+				prio = strtol(optarg, NULL, 0);
+				if (setpriority(PRIO_PROCESS, 0, prio) < 0)
+					perror("error");
+				break;
+			case 'i': /* iterations */
+				repeat = (uint64_t)strtol(optarg, NULL, 0);
+				printf("repeat=%lu\n", repeat);
+				break;
 		}
 
 	}
 
 	printf("xor_page_shift : %d -------------\n", xor_page_shift);
 
-	//g_mem_size += (1 << page_shift);
-	g_mem_size += (1 << page_shift) + (1 << xor_page_shift); 	//test
+	if(xor_page_shift >= 0)
+		g_mem_size += (1 << page_shift) + (1 << xor_page_shift);
+	else
+		g_mem_size += (1 << page_shift);
+
+#ifdef RANDOM
+	g_mem_size = CEIL(g_mem_size, ENTRY_DIST_AVG);
+#else
 	g_mem_size = CEIL(g_mem_size, ENTRY_DIST);
+#endif
 
 	/* alloc memory. align to a page boundary */
 	if (use_dev_mem) {
@@ -174,7 +183,7 @@ int main(int argc, char* argv[])
 	}
 
 	int off_idx = (1<<page_shift) / 4;
-	
+
 	if (xor_page_shift > 0) {
 		off_idx = ((1<<page_shift) + (1<<xor_page_shift)) / 4;
 	}
@@ -188,20 +197,39 @@ int main(int argc, char* argv[])
 	} 
 #endif
 
-#if defined(TEST)
-	printf("/////////////////ENTRY_DIST : %lu\n////////////////", ENTRY_DIST);
-	printf("/////////////////NUM_ENTRIES : %lu\n////////////////", NUM_ENTRIES);
-	printf("/////////////////NUM_ENTRIES * ENTRY_DIST : %lu\n////////////////", NUM_ENTRIES * ENTRY_DIST);
-	printf("/////////////////g_mem_size = NUM_ENTRIES * ENTRY_DIST : %lu\n////////////////", g_mem_size);
-#endif
 	list = &memchunk[off_idx];
+#ifdef RANDOM
+	/* bit RANGE_LEFT~RANGE_RIGHT : xxxxx present 32 entry dist, randomly assign one(choose from 32 dist) for each access, 
+	 * min entry dist = 2^RANGE_LEFT > 2^18: guarantee same cache set index.
+	*/
+	uint64_t ibit = 0;
+	int mask[NUM_ENTRIES] = {0};
+	struct timespec seed;
+	uint64_t entry_dist;
+	for(i = 0; i < NUM_ENTRIES; i++){
+		while(1){
+			clock_gettime(CLOCK_REALTIME, &seed);
+			ibit = seed.tv_nsec % (1 << (RANGE_RIGHT - RANGE_LEFT + 1));
+			if(mask[ibit] == 0){
+				mask[ibit] = 1;
+				break;
+			}
+		}
+		entry_dist = (uint64_t)(ibit << RANGE_LEFT);
+		indices[i] = entry_dist / 4;
+		//printf("%dth entry_dist %lx\n", i, entry_dist);
+	}
+#else
 	for (i = 0; i < NUM_ENTRIES; i++) {
 		if (i == (NUM_ENTRIES - 1))
 			indices[i] = 0;
 		else
 			indices[i] = (i + 1) * ENTRY_DIST/4;
 	}
-	next = 0;
+#endif
+
+	next = 0; 
+
 	printf("pshift: %d, XOR-pshift: %d\n", page_shift, xor_page_shift);
 
 	struct timespec start, end;
@@ -216,9 +244,9 @@ int main(int argc, char* argv[])
 	int64_t nsdiff = get_elapsed(&start, &end);
 	double  avglat = (double)nsdiff/naccess;
 
-	printf("size: %ld (%ld KB)\n", g_mem_size, g_mem_size/1024);
-	printf("duration %ld ns, #access %ld\n", nsdiff, naccess);
-	printf("average latency: %ld ns\n", nsdiff/naccess);
+	//printf("size: %ld (%ld KB)\n", g_mem_size, g_mem_size/1024);
+	//printf("duration %ld ns, #access %ld\n", nsdiff, naccess);
+	//printf("average latency: %ld ns\n", nsdiff/naccess);
 	printf("bandwidth %.2f MB/s\n", 64.0*1000.0*(double)naccess/(double)nsdiff);
 
 	return 0;
