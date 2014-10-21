@@ -36,8 +36,8 @@
 #define RANDOM 1
 
 #ifdef RANDOM
-#define RANGE_RIGHT 32
-#define RANGE_LEFT 28
+#define RANGE_RIGHT 29
+#define RANGE_LEFT 25
 #define ENTRY_DIST_AVG ((uint64_t)1 << (RANGE_LEFT))
 /* NUM_ENTRIES indices, randomly choose one for one access.
    whole length = 2^RANGE_LEFT */
@@ -76,12 +76,22 @@ uint64_t run(uint64_t iter)
 	uint64_t cnt = 0;
 	int data;
 
-	for (i = 0; i < iter; i++) {
+	for (i = 0; i < iter; i++){
+		//printf("%luth: indices[j=%lu],list[next=%lu]\t", i, j, next);
 		data = list[next];
 		next = indices[j];
-
+#if 0
+		/* hardware prefetch case */
 		j ++;
 		if(j == NUM_ENTRIES) j = 0;
+#endif
+#if 0
+		/* sequence access && avoid hardware prefetch 
+		* && twice access: because next has been updated!! 
+		*/
+		j = (list[next] + i + j ) % NUM_ENTRIES;
+#endif
+		j = (data + i + j) % NUM_ENTRIES;
 		cnt ++;
 	}
 	return cnt;

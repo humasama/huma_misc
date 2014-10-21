@@ -1,10 +1,10 @@
 #!/bin/bash
 killall -9 mc-mapping
 echo "Run a background task on core1-3"
-./mc-mapping -c 1 -i 100000000000 -b 0 -x >& /dev/null &
-./mc-mapping -c 2 -i 100000000000 -b 0 -x >& /dev/null &
-./mc-mapping -c 3 -i 100000000000 -b 0 -x >& /dev/null &
-sleep 2
+./mc-mapping -c 1 -i 100000000000000 -b 0 -x >& /dev/null &
+./mc-mapping -c 2 -i 100000000000000 -b 0 -x >& /dev/null &
+./mc-mapping -c 3 -i 100000000000000 -b 0 -x >& /dev/null &
+sleep 1
 
 echo "Now run the test"
 for b in `seq 0 27`; do	#upper limit : 28 #23
